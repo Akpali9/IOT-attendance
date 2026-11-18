@@ -13,8 +13,8 @@ type AdminAccessProps = {
 
 export function AdminAccess({ onSignIn, onBootstrap }: AdminAccessProps) {
   const [mode, setMode] = useState<AccessMode>("login")
-  const [username, setUsername] = useState("superadmin")
-  const [password, setPassword] = useState("password123")
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
   const [setupToken, setSetupToken] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -84,22 +84,21 @@ export function AdminAccess({ onSignIn, onBootstrap }: AdminAccessProps) {
             <p className="mt-2 text-sm leading-6 text-[#748078]">
               {isSetup
                 ? "Create the first administrator. The default superadmin account can be initialized once when the server-side bootstrap switch is enabled."
-                : "Sign in with your administrator username and password to open the LAM workspace."}
+                : "Sign in with your administrator email or username and password to open the LAM workspace."}
             </p>
 
             <form className="mt-7 space-y-4" onSubmit={submit}>
               <label className="block text-xs font-medium text-[#43544a]">
-                Username
+                Username or email
                 <input
                   autoComplete="username"
                   className="mt-1.5 w-full rounded-lg border border-[#e1e7e1] bg-white px-3.5 py-3 text-sm outline-none transition focus:border-[#73907a] focus:ring-2 focus:ring-[#73907a]/15"
-                  maxLength={32}
+                  maxLength={64}
                   minLength={3}
-                  pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{2,31}"
                   required
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="superadmin"
+                  placeholder="admin@lam.com"
                 />
               </label>
               <label className="block text-xs font-medium text-[#43544a]">
@@ -158,7 +157,6 @@ export function AdminAccess({ onSignIn, onBootstrap }: AdminAccessProps) {
                 {isSetup ? "Return to sign in" : "Set up the first administrator"}
               </button>
             </div>
-            
           </div>
         </section>
       </div>
