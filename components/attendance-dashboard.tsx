@@ -324,40 +324,34 @@ export default function AttendanceDashboard() {
 
   const signIn = useCallback(async ({ username, password }: Credentials) => {
     const normalizedUsername = username.trim().toLowerCase()
-    
-    // Validate username format (JS regex - no 'v' flag, safe)
-    if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(normalizedUsername)) {
-      return "Enter a valid administrator username and password."
+
+    const isValidUsername = /^[a-z0-9][a-z0-9._-]{2,31}$/.test(normalizedUsername)
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedUsername)
+
+    if (!isValidUsername && !isValidEmail) {
+      return "Enter a valid administrator username or email and password."
     }
 
-    // The bootstrap creates users with email: ${username}@attendance.invalid
-    const email = `${normalizedUsername}@attendance.invalid`
-    
+    const email = normalizedUsername.includes("@")
+      ? normalizedUsername
+      : `${normalizedUsername}@attendance.invalid`
+
     console.log("[signIn] Attempting login with email:", email)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
-      console.error("[signIn] Supabase auth error:", error.message, error.status)
-      // Return the actual error for debugging
-      if (error.message.includes("Invalid login credentials")) {
-        return "Invalid username or password. If you haven't bootstrapped yet, contact your administrator."
+    if (error || !data.user) {
+      console.error("[signIn] Supabase auth error:", error?.message)
+      if (error?.message?.includes("Invalid login credentials")) {
+        return "Invalid username/email or password."
       }
-      if (error.message.includes("Email not confirmed")) {
-        return "Email not confirmed. Please contact your administrator to confirm your account."
+      if (error?.message?.includes("Email not confirmed")) {
+        return "Email not confirmed. Ask an administrator to confirm the account."
       }
-      return `Login failed: ${error.message}`
+      return `Login failed: ${error?.message ?? "unknown error"}`
     }
 
-    if (!data.user) {
-      console.error("[signIn] No user returned from auth")
-      return "Login failed: no user returned."
-    }
-
-    console.log("[signIn] Auth successful, checking admin profile for user:", data.user.id)
+    console.log("[signIn] Auth successful, checking admin profile:", data.user.id)
 
     const { data: profile, error: profileError } = await supabase
       .from("attendance_admins")
@@ -372,9 +366,9 @@ export default function AttendanceDashboard() {
     }
 
     if (!profile) {
-      console.error("[signIn] No admin profile found for user:", data.user.id)
+      console.error("[signIn] No admin profile for user:", data.user.id)
       await supabase.auth.signOut()
-      return "This account exists but is not registered as an administrator. The bootstrap may not have completed."
+      return "This account is not registered as an administrator."
     }
 
     console.log("[signIn] Admin profile found:", profile)
@@ -397,14 +391,13 @@ export default function AttendanceDashboard() {
     }
 
     const result = await response.json().catch(() => null) as { error?: string; ok?: boolean } | null
-    
+
     if (!response.ok) {
       console.error("[bootstrap] Server error:", response.status, result)
       return result?.error ?? `Administrator setup failed (${response.status}).`
     }
 
     console.log("[bootstrap] Success:", result)
-    // After successful bootstrap, sign in with the created credentials
     return signIn({ username, password })
   }, [signIn])
 
