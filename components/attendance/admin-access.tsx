@@ -160,9 +160,7 @@ export function AdminAccess({ onSignIn, onBootstrap }: AdminAccessProps) {
                 {isSetup ? "Return to sign in" : "Set up the first administrator"}
               </button>
             </div>
-            <p className="mt-5 text-center text-[10px] leading-5 text-[#98a29b]">
-              Default first-login account: superadmin / password123 (change this password immediately after setup).
-            </p>
+            
           </div>
         </section>
       </div>
