@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, type FormEvent } from "react"
 import { Fingerprint, KeyRound, ShieldCheck } from "lucide-react"
 import { ORGANIZATION_NAME, ORGANIZATION_SHORT_NAME } from "./constants"
