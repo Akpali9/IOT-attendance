@@ -95,7 +95,7 @@ export function AdminAccess({ onSignIn, onBootstrap }: AdminAccessProps) {
                   className="mt-1.5 w-full rounded-lg border border-[#e1e7e1] bg-white px-3.5 py-3 text-sm outline-none transition focus:border-[#73907a] focus:ring-2 focus:ring-[#73907a]/15"
                   maxLength={32}
                   minLength={3}
-                  pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}"
+                  pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{2,31}"
                   required
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
