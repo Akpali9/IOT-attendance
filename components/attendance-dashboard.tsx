@@ -324,15 +324,40 @@ export default function AttendanceDashboard() {
 
   const signIn = useCallback(async ({ username, password }: Credentials) => {
     const normalizedUsername = username.trim().toLowerCase()
+    
+    // Validate username format (JS regex - no 'v' flag, safe)
     if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(normalizedUsername)) {
       return "Enter a valid administrator username and password."
     }
 
+    // The bootstrap creates users with email: ${username}@attendance.invalid
+    const email = `${normalizedUsername}@attendance.invalid`
+    
+    console.log("[signIn] Attempting login with email:", email)
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: `${normalizedUsername}@attendance.invalid`,
+      email,
       password,
     })
-    if (error || !data.user) return "Invalid username or password."
+
+    if (error) {
+      console.error("[signIn] Supabase auth error:", error.message, error.status)
+      // Return the actual error for debugging
+      if (error.message.includes("Invalid login credentials")) {
+        return "Invalid username or password. If you haven't bootstrapped yet, contact your administrator."
+      }
+      if (error.message.includes("Email not confirmed")) {
+        return "Email not confirmed. Please contact your administrator to confirm your account."
+      }
+      return `Login failed: ${error.message}`
+    }
+
+    if (!data.user) {
+      console.error("[signIn] No user returned from auth")
+      return "Login failed: no user returned."
+    }
+
+    console.log("[signIn] Auth successful, checking admin profile for user:", data.user.id)
 
     const { data: profile, error: profileError } = await supabase
       .from("attendance_admins")
@@ -340,11 +365,19 @@ export default function AttendanceDashboard() {
       .eq("user_id", data.user.id)
       .maybeSingle()
 
-    if (profileError || !profile) {
+    if (profileError) {
+      console.error("[signIn] Profile query error:", profileError.message)
       await supabase.auth.signOut()
-      return "This account is not authorized for LAM attendance."
+      return `Profile check failed: ${profileError.message}`
     }
 
+    if (!profile) {
+      console.error("[signIn] No admin profile found for user:", data.user.id)
+      await supabase.auth.signOut()
+      return "This account exists but is not registered as an administrator. The bootstrap may not have completed."
+    }
+
+    console.log("[signIn] Admin profile found:", profile)
     await refreshAdmin()
     return null
   }, [refreshAdmin, supabase])
@@ -358,12 +391,20 @@ export default function AttendanceDashboard() {
         credentials: "same-origin",
         body: JSON.stringify({ username, password, setupToken }),
       })
-    } catch {
-      return "Administrator setup could not be reached. Please try again."
+    } catch (err) {
+      console.error("[bootstrap] Network error:", err)
+      return "Administrator setup could not be reached. Check your connection and try again."
     }
 
-    const result = await response.json().catch(() => null) as { error?: string } | null
-    if (!response.ok) return result?.error ?? "Administrator setup could not be completed."
+    const result = await response.json().catch(() => null) as { error?: string; ok?: boolean } | null
+    
+    if (!response.ok) {
+      console.error("[bootstrap] Server error:", response.status, result)
+      return result?.error ?? `Administrator setup failed (${response.status}).`
+    }
+
+    console.log("[bootstrap] Success:", result)
+    // After successful bootstrap, sign in with the created credentials
     return signIn({ username, password })
   }, [signIn])
 
@@ -680,7 +721,7 @@ export default function AttendanceDashboard() {
                       <span className="grid size-9 place-items-center rounded-lg bg-[#f0f2ef] text-[#6e7c72]"><Fingerprint size={16} aria-hidden="true" /></span>
                       <div>
                         <h3 className="text-xs font-semibold">Biometrics & IoT fingerprint</h3>
-                        <p className="mt-1 text-[10px] leading-5 text-[#87928b]">Android phone biometrics are supported through WebAuthn passkeys. Enroll a member phone from that member’s profile, then use Phone fingerprint to record attendance.</p>
+                        <p className="mt-1 text-[10px] leading-5 text-[#87928b]">Android phone biometrics are supported through WebAuthn passkeys. Enroll a member phone from that member's profile, then use Phone fingerprint to record attendance.</p>
                       </div>
                     </div>
                   </article>
