@@ -44,7 +44,7 @@ export function speak(text: string) {
 }
 
 type AttendanceOutcome = {
-  status: "accepted" | "checked_out" | "already_completed" | "not_registered"
+  status: "accepted" | "checked_out" | "already_completed" | "not_registered" | "face_not_enrolled" | "face_mismatch"
   member?: { name?: string }
 }
 
@@ -62,7 +62,13 @@ export function announceOutcome(result: AttendanceOutcome) {
     case "already_completed":
       text = name ? `Declined. ${name} has already completed attendance today.` : "Declined. Attendance already completed today."
       break
-    default:
+    case "face_not_enrolled":
+      text = "Declined. No registered face profile is available."
+      break
+    case "face_mismatch":
+      text = "Declined. The live face does not match the registered profile."
+      break
+    case "not_registered":
       text = "Declined. Not registered."
   }
   speak(text)
