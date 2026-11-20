@@ -4,7 +4,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'LAM Attendance | Ambassador Ministry LAM',
-  description: 'Secure member ID card, QR and IoT-enabled attendance management for Ambassador Ministry LAM.',
+  description: 'Secure QR card and Android fingerprint attendance management for Ambassador Ministry LAM.',
   generator: 'v0.app',
   icons: {
     icon: [

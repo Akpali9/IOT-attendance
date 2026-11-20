@@ -58,7 +58,7 @@ async function loadDashboardData(client: SupabaseClient, date: string): Promise<
   const [membersResult, recordsResult] = await Promise.all([
     client
       .from("attendance_members")
-      .select("id,full_name,department,phone,email,qr_token,iot_device_user_id,face_photo_path,created_at")
+      .select("id,full_name,department,phone,email,qr_token,face_photo_path,created_at")
       .order("full_name", { ascending: true }),
     client
       .from("attendance_records")
@@ -296,6 +296,25 @@ export default function AttendanceDashboard() {
     revalidateOnFocus: true,
   })
 
+  // Subscribe to database changes so every signed-in admin sees scans and member edits
+  // without refreshing the page. Realtime events trigger a fresh authoritative read.
+  useEffect(() => {
+    if (!isAdmin) return
+    const channel = supabase
+      .channel(`attendance-live-${attendanceDate}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance_records", filter: `attendance_date=eq.${attendanceDate}` }, () => {
+        void mutateDashboard()
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance_members" }, () => {
+        void mutateDashboard()
+      })
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [attendanceDate, isAdmin, mutateDashboard, supabase])
+
   const recordsByMember = useMemo(() => {
     return new Map((dashboard?.records ?? []).map((record) => [record.member_id, record]))
   }, [dashboard?.records])
@@ -445,7 +464,6 @@ export default function AttendanceDashboard() {
         department: values.department.trim(),
         phone: values.phone.trim(),
         email: values.email.trim().toLowerCase(),
-        iot_device_user_id: values.iot_device_user_id.trim() || null,
       }
 
       if (editingMember) {
@@ -713,8 +731,8 @@ export default function AttendanceDashboard() {
                     <div className="flex items-start gap-3">
                       <span className="grid size-9 place-items-center rounded-lg bg-[#f0f2ef] text-[#6e7c72]"><Fingerprint size={16} aria-hidden="true" /></span>
                       <div>
-                        <h3 className="text-xs font-semibold">Biometrics & IoT fingerprint</h3>
-                        <p className="mt-1 text-[10px] leading-5 text-[#87928b]">Android phone biometrics are supported through WebAuthn passkeys. Enroll a member phone from that member's profile, then use Phone fingerprint to record attendance.</p>
+                        <h3 className="text-xs font-semibold">Android phone fingerprint</h3>
+                        <p className="mt-1 text-[10px] leading-5 text-[#87928b]">Members can also sign attendance with their phone's fingerprint. Enroll a member's phone from their profile, then use Phone fingerprint to record attendance.</p>
                       </div>
                     </div>
                   </article>
@@ -739,7 +757,7 @@ export default function AttendanceDashboard() {
                         <li key={record.id} className="flex items-center justify-between gap-3 px-5 py-3">
                           <div className="flex min-w-0 items-center gap-3">
                             <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#edf3ed] text-[9px] font-semibold text-[#45674c]">{initials(member.full_name)}</span>
-                            <div className="min-w-0"><div className="truncate text-xs font-medium text-[#374d3d]">{member.full_name}</div><div className="mt-0.5 text-[10px] text-[#8b958e]">{member.department} · {record.method === "iot_fingerprint" ? "IoT fingerprint" : record.method === "id_card" ? "ID card" : "QR / ID card"}</div></div>
+                            <div className="min-w-0"><div className="truncate text-xs font-medium text-[#374d3d]">{member.full_name}</div><div className="mt-0.5 text-[10px] text-[#8b958e]">{member.department} · {record.method === "phone_passkey" ? "Phone fingerprint" : "QR card"}</div></div>
                           </div>
                           <div className="shrink-0 text-right"><div className="text-[10px] font-medium text-[#647269]">{action}</div><div className="mt-0.5 text-[10px] text-[#929b95]">{formatTime(eventTime)}</div></div>
                         </li>
@@ -798,7 +816,7 @@ export default function AttendanceDashboard() {
                   <div className="flex gap-3 rounded-lg bg-[#f7f9f6] p-3"><span className="mt-0.5 text-[#52775a]"><ClipboardList size={15} aria-hidden="true" /></span><div><div className="text-xs font-medium text-[#3f5546]">Scan-only attendance</div><p className="mt-1 text-[10px] leading-5 text-[#849087]">Check-in and check-out are recorded atomically by the database scan function. There is no manual attendance override in this workspace.</p></div></div>
                   <div className="flex gap-3 rounded-lg bg-[#f7f9f6] p-3"><span className="mt-0.5 text-[#52775a]"><Building2 size={15} aria-hidden="true" /></span><div><div className="text-xs font-medium text-[#3f5546]">Private photo storage</div><p className="mt-1 text-[10px] leading-5 text-[#849087]">Member photos use private storage with short-lived signed URLs for authorized administrators.</p></div></div>
                 </div>
-                <div className="mt-4 rounded-lg border border-[#e7eae5] px-3.5 py-3 text-[10px] leading-5 text-[#88938b]">Android phone passkeys are verified server-side through WebAuthn; the browser never receives fingerprint data. Physical IoT fingerprint terminals still require a compatible device and vendor bridge.</div>
+                <div className="mt-4 rounded-lg border border-[#e7eae5] px-3.5 py-3 text-[10px] leading-5 text-[#88938b]">Android phone passkeys are verified server-side through WebAuthn; the browser never receives fingerprint data.</div>
               </article>
               </div>
             </section>

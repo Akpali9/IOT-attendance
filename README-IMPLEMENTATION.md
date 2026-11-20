@@ -1,10 +1,20 @@
-# LAM Attendance – implementation update
+# LAM Attendance – QR card + Android fingerprint build
+
+**Two attendance methods:** (1) a phone camera scans the QR on the member's ID card, or (2) the member signs with their Android phone fingerprint (WebAuthn passkey, built-in platform authenticator only). The IoT terminal webhook was removed; apply `202611200001_remove_iot_terminal.sql`. Older sections below that mention IoT terminals are historical.
+
+**Limit:** a web page can't force fingerprint specifically; if no fingerprint is enrolled, Android may offer its PIN/pattern.
+
+---
+
+# Original implementation notes
 
 This package builds on the supplied Next.js + Supabase attendance application.
 
 ## Included in this update
 
-- Camera-based member ID card scanning. The generated member card already contains an opaque QR credential; the scanner now requests the rear/environment camera and verifies the credential through the existing database attendance transaction.
+- Live rear-camera QR scanning for member ID cards. The generated card contains an opaque QR credential; the scanner verifies it through the attendance database transaction.
+- Live front-camera member photo capture in the member form, with preview and upload to the configured private Supabase photo bucket.
+- Supabase Realtime subscriptions for attendance records and member changes. Signed-in admin dashboards automatically refresh after check-in, check-out, or member edits.
 - One-time `superadmin` bootstrap using the requested initial password `password123`, controlled by a server-only environment switch. The bootstrap assigns the `superadmin` role in `attendance_admins`.
 - A password-change panel so the initial password can be replaced from **Access & security**.
 - Optional IoT terminal user ID field on member profiles.
@@ -13,15 +23,21 @@ This package builds on the supplied Next.js + Supabase attendance application.
 
 ## Required deployment steps
 
-1. Configure the variables in `.env.example` in the hosting provider and Supabase. Keep service-role keys and device secrets server-side.
-2. Apply `supabase/migrations/202611180001_iot_fingerprint_attendance.sql` in Supabase before using the new IoT member field.
+1. Copy `.env.example` to `.env.local` for local development and add the corresponding variables in Vercel → Project → Settings → Environment Variables. Keep service-role keys and device secrets server-side; never add a `NEXT_PUBLIC_` prefix to them.
+2. Apply all migrations in `supabase/migrations/` in filename order. This includes IoT fingerprint terminal support, Android passkeys, and live dashboard updates.
 3. Set `ATTENDANCE_ENABLE_DEFAULT_ADMIN_BOOTSTRAP=true` temporarily for first initialization. In the app choose **Set up the first administrator** and submit `superadmin` / `password123`. After the account is created, immediately set the switch to `false` or remove it.
 4. Sign in, open **Access & security**, and change the password to a unique 12+ character password.
 5. For fingerprint hardware, configure a vendor terminal or gateway to call `/api/iot/fingerprint` as documented. The device model and vendor SDK determine the bridge configuration.
 
-## Important biometric limitation
+## Biometric and camera behaviour
 
-A web page cannot read a phone's fingerprint or biometric template. On phones, the secure supported route is WebAuthn/passkeys, which requires a verified server-side credential registration and assertion flow. This update does not falsely mark phone fingerprint attendance as implemented. The IoT terminal integration is ready at the normalized webhook/database layer, but requires compatible physical hardware and vendor configuration.
+A web page cannot read a phone fingerprint sensor or fingerprint template directly. Phone attendance uses WebAuthn/passkeys: the operating system prompts for fingerprint, face unlock, or an allowed device screen-lock method, and the server verifies the signed assertion before attendance is recorded. The app never receives biometric images or templates. The separate IoT endpoint accepts a matched user ID from a compatible physical fingerprint terminal; a vendor-specific bridge and hardware enrollment are still required.
+
+The member form includes a live front-camera capture flow. The ID-card scanner uses the rear camera for QR scanning. Camera access requires HTTPS (or localhost during development) and the user must grant browser camera permission.
+
+## Live dashboard setup
+
+Apply `202611190001_realtime_attendance.sql` to add `attendance_records` and `attendance_members` to the `supabase_realtime` publication. If the publication is not available in your Supabase project, enable Realtime for both tables in Database → Publications. The dashboard subscribes to changes and re-reads the current date's records; a browser refresh is not required.
 
 ## Validation
 
@@ -41,7 +57,7 @@ This build now includes a real WebAuthn/passkey enrollment and authentication fl
    - `WEBAUTHN_ORIGIN=https://attendance.yourdomain.com` (exact origin, no trailing slash)
    - `WEBAUTHN_RP_ID=attendance.yourdomain.com` (hostname only)
    - `WEBAUTHN_RP_NAME=LAM Attendance`
-4. Deploy on HTTPS. WebAuthn does not work on an ordinary insecure HTTP production origin. `localhost` is permitted for local development.
+4. Deploy on HTTPS. Set `WEBAUTHN_ORIGIN` to the exact site origin (for example `https://your-project.vercel.app`, with no trailing slash) and `WEBAUTHN_RP_ID` to its hostname only. WebAuthn does not work on an ordinary insecure HTTP production origin. `localhost` is permitted for local development.
 5. Open a member's profile in the administrator workspace. On that member's Android phone, use Chrome and authenticate as an administrator, then choose **Enroll this phone** and complete the Android prompt. The passkey is bound to that member profile.
 6. Open **Phone fingerprint** from Overview or Attendance, enter the member email, and complete the Android biometric/passkey prompt. First successful authentication checks the member in; the next checks them out.
 

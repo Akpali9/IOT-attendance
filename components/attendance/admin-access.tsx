@@ -60,13 +60,13 @@ export function AdminAccess({ onSignIn, onBootstrap }: AdminAccessProps) {
                 Attendance with trust built in.
               </h1>
               <p className="mt-4 max-w-sm text-sm leading-6 text-[#d0ddd4]">
-                Member details stay behind administrator access. Attendance can be captured from member ID cards, QR credentials, and supported fingerprint devices.
+                Member details stay behind administrator access. Attendance can be captured from member ID card QR codes or an Android phone fingerprint.
               </p>
             </div>
           </div>
           <div className="mt-10 flex items-center gap-2 text-xs text-[#c4d4ca]">
             <ShieldCheck size={15} aria-hidden="true" />
-            Private member records · ID card scanning · IoT-ready attendance
+            Private member records · QR card scanning · Android fingerprint
           </div>
         </section>
 

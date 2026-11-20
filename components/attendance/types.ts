@@ -5,7 +5,6 @@ export type AttendanceMember = {
   phone: string
   email: string
   qr_token: string
-  iot_device_user_id?: string | null
   face_photo_path: string | null
   created_at: string
   photoUrl?: string | null

@@ -16,8 +16,8 @@ export async function POST(request: Request) {
     const { rpID, rpName } = webAuthnConfig()
     const options = await generateRegistrationOptions({
       rpName, rpID, userName: member.email, userDisplayName: member.full_name,
-      userID: new Uint8Array(Buffer.from(member.id)), attestationType: 'none',
-      authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' },
+      userID: new Uint8Array(Buffer.from(member.id)), attestationType: 'none', preferredAuthenticatorType: 'localDevice',
+      authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
       excludeCredentials: (existing ?? []).map((item) => ({ id: item.credential_id, transports: item.transports ?? [] })),
     })
     await db.from('attendance_passkey_challenges').delete().eq('member_id', memberId).eq('purpose', 'register')

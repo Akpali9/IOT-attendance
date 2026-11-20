@@ -20,7 +20,7 @@ SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
 
 Run these migrations in order:
 
-1. `supabase/migrations/202611180001_iot_fingerprint_attendance.sql`
+1. `supabase/migrations/202611180001_iot_fingerprint_attendance.sql` (legacy)
 2. `supabase/migrations/202611180002_android_passkey_attendance.sql`
 
 ## Enroll a member phone

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react"
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
 import { Camera, Download, ImagePlus, LoaderCircle, QrCode, UserRound, X } from "lucide-react"
 import QRCode from "qrcode"
 import { ORGANIZATION_NAME, ORGANIZATION_SHORT_NAME } from "./constants"
@@ -13,7 +13,6 @@ export type MemberFormValues = {
   department: string
   phone: string
   email: string
-  iot_device_user_id: string
 }
 
 type MemberFormDialogProps = {
@@ -31,7 +30,6 @@ const emptyValues: MemberFormValues = {
   department: "",
   phone: "",
   email: "",
-  iot_device_user_id: "",
 }
 
 export function MemberFormDialog({
@@ -47,6 +45,10 @@ export function MemberFormDialog({
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -55,7 +57,6 @@ export function MemberFormDialog({
       department: member?.department ?? "",
       phone: member?.phone ?? "",
       email: member?.email ?? "",
-      iot_device_user_id: member?.iot_device_user_id ?? "",
     })
     setPhotoFile(null)
     setFileError(null)
@@ -70,7 +71,38 @@ export function MemberFormDialog({
     setPreview(member?.photoUrl ?? null)
   }, [photoFile, member?.photoUrl])
 
+  useEffect(() => {
+    if (!cameraOpen) return
+    let cancelled = false
+    const start = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error("Live camera requires HTTPS and a supported browser.")
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "user" }, width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false })
+        if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
+        cameraStreamRef.current = stream
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play() }
+      } catch (error) { setCameraError(error instanceof Error ? error.message : "Could not access the camera. Check browser permission.") }
+    }
+    void start()
+    return () => { cancelled = true; cameraStreamRef.current?.getTracks().forEach((track) => track.stop()); cameraStreamRef.current = null }
+  }, [cameraOpen])
+
   if (!open) return null
+
+  const capturePhoto = () => {
+    const video = videoRef.current
+    if (!video || !video.videoWidth || !video.videoHeight) { setCameraError("Camera is not ready yet. Try again in a moment."); return }
+    const canvas = document.createElement("canvas")
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight
+    const context = canvas.getContext("2d")
+    if (!context) { setCameraError("Photo capture is unavailable on this browser."); return }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    canvas.toBlob((blob) => {
+      if (!blob) { setCameraError("The photo could not be captured."); return }
+      setPhotoFile(new File([blob], `member-${Date.now()}.jpg`, { type: "image/jpeg" }))
+      setFileError(null); setCameraOpen(false)
+    }, "image/jpeg", 0.88)
+  }
 
   const update = (key: keyof MemberFormValues, value: string) =>
     setValues((current) => ({ ...current, [key]: value }))
@@ -132,6 +164,12 @@ export function MemberFormDialog({
               {member && <div className="mt-1 text-[10px] text-[#8b958e]">Leave unchanged to keep the current photo.</div>}
             </div>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setCameraError(null); setCameraOpen(true) }} className="rounded-lg border border-[#dfe6de] px-3 py-2 text-[10px] font-semibold text-[#49634f] hover:bg-[#f7faf6]">
+              <Camera size={13} className="mr-1.5 inline" />Open live camera
+            </button>
+            {photoFile && <span className="self-center text-[10px] text-[#54765b]">Photo ready to save</span>}
+          </div>
           {fileError && <p className="text-xs text-[#a45343]" role="alert">{fileError}</p>}
 
           <label className="block text-[11px] font-medium text-[#43544a]">
@@ -153,11 +191,6 @@ export function MemberFormDialog({
               <input required type="email" maxLength={254} value={values.email} onChange={(event) => update("email", event.target.value)} className="mt-1.5 w-full rounded-lg border border-[#e3e8e2] px-3 py-2.5 text-xs outline-none focus:border-[#77957d]" placeholder="member@example.org" />
             </label>
           </div>
-          <label className="block text-[11px] font-medium text-[#43544a]">
-            IoT fingerprint terminal user ID <span className="font-normal text-[#94a098]">(optional)</span>
-            <input maxLength={128} value={values.iot_device_user_id} onChange={(event) => update("iot_device_user_id", event.target.value)} className="mt-1.5 w-full rounded-lg border border-[#e3e8e2] px-3 py-2.5 text-xs outline-none focus:border-[#77957d]" placeholder="Enrolled ID from your fingerprint terminal" />
-            <span className="mt-1 block text-[10px] leading-4 text-[#89948c]">Enter the exact user ID assigned by the connected fingerprint terminal. Enroll the fingerprint on the terminal itself.</span>
-          </label>
           {error && <p role="alert" className="rounded-lg border border-[#efd6d0] bg-[#fbf1ef] px-3 py-2.5 text-xs leading-5 text-[#965544]">{error}</p>}
           <div className="flex justify-end gap-2 border-t border-[#edf0ec] pt-4">
             <button type="button" onClick={onClose} className="rounded-lg border border-[#e3e8e2] px-4 py-2.5 text-xs font-medium text-[#627168] hover:bg-[#f8faf7]">Cancel</button>
@@ -168,6 +201,16 @@ export function MemberFormDialog({
           </div>
         </form>
       </section>
+      {cameraOpen && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-[#10241c]/80 p-4">
+          <section role="dialog" aria-modal="true" aria-label="Capture member photo" className="w-full max-w-md overflow-hidden rounded-2xl bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-[#263b2e]">Capture member photo</h3><button type="button" onClick={() => setCameraOpen(false)} className="rounded-lg p-2 hover:bg-[#f3f6f2]" aria-label="Close camera"><X size={17}/></button></div>
+            <video ref={videoRef} muted playsInline className="aspect-[4/3] w-full rounded-xl bg-[#10241c] object-cover" />
+            {cameraError && <p role="alert" className="mt-2 text-xs text-[#a45343]">{cameraError}</p>}
+            <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setCameraOpen(false)} className="rounded-lg border border-[#e3e8e2] px-3 py-2 text-xs">Cancel</button><button type="button" onClick={capturePhoto} className="rounded-lg bg-[#193e30] px-4 py-2 text-xs font-semibold text-white">Capture photo</button></div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
