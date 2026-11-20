@@ -78,3 +78,31 @@ This build now includes a real WebAuthn/passkey enrollment and authentication fl
 - Challenges are single-use and stored server-side. Credential public keys and signature counters are stored; biometric templates are not.
 - Passkey APIs use the Supabase service role only on the server. Never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
 - Apply database backups, HTTPS, access logging, and a tested account recovery process before production use.
+
+---
+
+# QR + face verification attendance update
+
+The QR attendance scanner now runs a two-stage flow:
+
+1. Scan the opaque member QR credential with the rear camera.
+2. Automatically request the front camera and show a face-positioning frame.
+3. The operator/member captures the live face image.
+4. The server resolves the QR credential, loads the member's existing private `face_photo_path`, and compares the live capture against that registered photo using the Face++ Compare API.
+5. Only when the comparison confidence meets `FACE_MATCH_THRESHOLD` does the server call `record_qr_attendance`. A missing face profile, mismatch, API/configuration error, or unregistered QR never records attendance.
+
+## Facial verification configuration
+
+Set these server-only environment variables in local `.env.local` and the deployment environment:
+
+- `FACEPP_API_KEY`
+- `FACEPP_API_SECRET`
+- `FACE_MATCH_THRESHOLD` (0–100; default 80)
+
+Apply `supabase/migrations/202611200003_qr_face_verification_gate.sql` after the existing migrations. It removes direct browser execution of the QR attendance RPC; only the server service-role route may write QR attendance. Existing registered member photos in the private `attendance-member-photos` bucket are used as the reference profiles. Members without a registered photo must be enrolled before using QR + face attendance.
+
+**Important security limitation:** Face++ Compare verifies similarity, but this integration does not implement active liveness detection. A printed photograph or replayed screen may still be presented to the camera. Do not represent this as spoof-resistant or deploy it for high-assurance attendance until an approved liveness/anti-spoof check is added and tested. Live face images are transmitted to Face++ for comparison; obtain appropriate consent, disclose this processing, and confirm the provider's data-retention and regional requirements before production use.
+
+## QR attendance API
+
+`POST /api/attendance/qr-face` requires an authenticated administrator session and an `attendance_admins` record. It accepts an opaque QR token and a JPEG/PNG data URL, performs the face comparison server-side, and records attendance only after a successful match. The service-role key and Face++ credentials remain server-side.

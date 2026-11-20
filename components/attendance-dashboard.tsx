@@ -425,20 +425,20 @@ export default function AttendanceDashboard() {
     setAuthUser(null)
   }, [supabase])
 
-  const scanQr = useCallback(async (token: string): Promise<ScanResult> => {
-    const { data, error } = await supabase.rpc("record_qr_attendance", {
-      p_qr_token: token.trim(),
+  const scanQr = useCallback(async (token: string, faceImage: string): Promise<ScanResult> => {
+    const response = await fetch("/api/attendance/qr-face", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ qrToken: token.trim(), faceImage }),
     })
-    if (error) throw new Error("Attendance could not be recorded.")
-    const result = data as ScanResult
-    if (!result || !["accepted", "checked_out", "already_completed", "not_registered"].includes(result.status)) {
-      throw new Error("Attendance response was not recognized.")
+    const result = await response.json().catch(() => null) as (ScanResult & { error?: string }) | null
+    if (!response.ok) throw new Error(result?.error ?? "Face verification failed. No attendance was recorded.")
+    if (!result || !["accepted", "checked_out", "already_completed", "not_registered", "face_not_enrolled", "face_mismatch"].includes(result.status)) {
+      throw new Error("Attendance verification response was not recognized.")
     }
-    if (result.status === "accepted" || result.status === "checked_out") {
-      await mutateDashboard()
-    }
+    if (result.status === "accepted" || result.status === "checked_out") await mutateDashboard()
     return result
-  }, [mutateDashboard, supabase])
+  }, [mutateDashboard])
 
   const saveMember = useCallback(async (values: MemberFormValues, photo: File | null): Promise<string | null> => {
     if (!authUser) return null

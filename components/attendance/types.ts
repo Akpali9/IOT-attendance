@@ -32,7 +32,7 @@ export type AdminProfile = {
 }
 
 export type ScanResult = {
-  status: "accepted" | "checked_out" | "already_completed" | "not_registered"
+  status: "accepted" | "checked_out" | "already_completed" | "not_registered" | "face_not_enrolled" | "face_mismatch"
   member?: {
     id: string
     name: string
