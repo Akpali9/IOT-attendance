@@ -112,3 +112,8 @@ Apply `supabase/migrations/202611200003_qr_face_verification_gate.sql` after the
 ## QR attendance save-function repair
 
 Apply `supabase/migrations/202611200004_create_qr_attendance_rpc.sql` in the Supabase SQL Editor after the QR face verification migration. This creates the `record_qr_attendance(text)` database function invoked by `/api/attendance/qr-face`. The API route now logs the underlying Supabase RPC error server-side and returns an actionable diagnostic to the scanner. Attendance is still written only after face comparison succeeds.
+
+
+## Fix for attendance_records_method_check
+
+If QR face verification succeeds but saving fails with a violation of `attendance_records_method_check`, apply `supabase/migrations/202611200005_allow_qr_face_attendance_method.sql` in the Supabase SQL Editor. It reads and preserves the existing CHECK expression, then extends it to also permit `qr_face`. It does not remove the existing allowed-method rules.
