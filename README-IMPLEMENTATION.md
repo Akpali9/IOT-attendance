@@ -107,3 +107,8 @@ Apply `supabase/migrations/202611200003_qr_face_verification_gate.sql` after the
 ## QR attendance API
 
 `POST /api/attendance/qr-face` requires an authenticated administrator session and an `attendance_admins` record. It accepts an opaque QR token and a JPEG/PNG data URL, performs the face comparison server-side, and records attendance only after a successful match. The service-role key and Face++ credentials remain server-side.
+
+
+## QR attendance save-function repair
+
+Apply `supabase/migrations/202611200004_create_qr_attendance_rpc.sql` in the Supabase SQL Editor after the QR face verification migration. This creates the `record_qr_attendance(text)` database function invoked by `/api/attendance/qr-face`. The API route now logs the underlying Supabase RPC error server-side and returns an actionable diagnostic to the scanner. Attendance is still written only after face comparison succeeds.

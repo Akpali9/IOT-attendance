@@ -73,7 +73,29 @@ export async function POST(request: Request) {
     if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) return json({ error: "FACE_MATCH_THRESHOLD must be a number from 0 to 100. Attendance was not recorded." }, 500)
     if (result.confidence < threshold) return json({ status: "face_mismatch", message: "Face does not match the registered member. No attendance was recorded." })
     const { data, error } = await db.rpc("record_qr_attendance", { p_qr_token: body.qrToken.trim() })
-    if (error) return json({ error: "Verified attendance could not be saved. Please retry." }, 500)
+    if (error) {
+      // Keep the raw database details in server logs, but return actionable,
+      // non-secret diagnostics to the authenticated admin in the scanner.
+      console.error("[qr-face] Attendance RPC failed", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      })
+      const code = error.code ? ` (database code ${error.code})` : ""
+      const detail = error.code === "42883"
+        ? "The record_qr_attendance database function is missing. Apply the QR attendance save migration in Supabase."
+        : error.code === "42501"
+          ? "Supabase denied permission to save attendance. Reapply the QR attendance permissions migration."
+          : error.code === "23505"
+            ? "An attendance record already exists for this member and date. Refresh the attendance dashboard."
+            : `Supabase could not save the verified attendance: ${error.message}`
+      return json({ error: `${detail}${code} Face verification succeeded, but no attendance was recorded.` }, 500)
+    }
+    if (!data || typeof data !== "object") {
+      console.error("[qr-face] Attendance RPC returned unexpected data", data)
+      return json({ error: "The attendance database returned an unexpected response. No attendance confirmation was received." }, 500)
+    }
     return json({ ...(data as Record<string, unknown>), face_verified: true, face_confidence: Math.round(result.confidence * 100) / 100 })
   } catch (error) {
     const detail = error instanceof Error && error.name === "TimeoutError" ? "Face++ comparison timed out. Try again with a stable internet connection." : "Face verification service is unavailable. Check the FACEPP_API_URL and try again."
