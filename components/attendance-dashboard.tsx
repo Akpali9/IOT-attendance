@@ -54,6 +54,28 @@ const navItems: NavItem[] = [
   { title: "Access & security", icon: ShieldCheck },
 ]
 
+async function normalizeMemberFacePhoto(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file)
+  try {
+    const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const context = canvas.getContext("2d")
+    if (!context) throw new Error("Could not prepare the face photograph. Please choose another image.")
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    for (const quality of [0.78, 0.68, 0.58]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality))
+      if (blob && blob.size <= 1_700_000) {
+        return new File([blob], `member-face-${Date.now()}.jpg`, { type: "image/jpeg" })
+      }
+    }
+    throw new Error("The face photograph could not be compressed below 1.7 MB. Please use a clearer, smaller image.")
+  } finally {
+    bitmap.close()
+  }
+}
+
 async function loadDashboardData(client: SupabaseClient, date: string): Promise<DashboardData> {
   const [membersResult, recordsResult] = await Promise.all([
     client
@@ -452,11 +474,11 @@ export default function AttendanceDashboard() {
         if (!["image/jpeg", "image/png", "image/webp"].includes(photo.type) || photo.size > 5 * 1024 * 1024) {
           throw new Error("Invalid photo")
         }
-        const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg"
-        uploadedPath = `${authUser.id}/${crypto.randomUUID()}.${extension}`
+        const normalizedPhoto = await normalizeMemberFacePhoto(photo)
+        uploadedPath = `${authUser.id}/${crypto.randomUUID()}.jpg`
         const { error } = await supabase.storage
           .from(MEMBER_PHOTO_BUCKET)
-          .upload(uploadedPath, photo, { contentType: photo.type, cacheControl: "3600", upsert: false })
+          .upload(uploadedPath, normalizedPhoto, { contentType: "image/jpeg", cacheControl: "3600", upsert: false })
         if (error) throw error
       }
 

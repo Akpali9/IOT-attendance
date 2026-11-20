@@ -66,11 +66,15 @@ export function ScannerDialog({ open, onClose, onScan }: Props) {
   const captureAndVerify = async () => {
     const video = faceVideoRef.current, canvas = canvasRef.current
     if (!video || !canvas || !video.videoWidth || !tokenRef.current || processingRef.current === false) return
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight
+    // Face++ limits each uploaded image to 2 MB. Downscale the live frame
+    // before converting it to base64 so the JSON request stays comfortably small.
+    const scale = Math.min(1, 1024 / Math.max(video.videoWidth, video.videoHeight))
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale))
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
     const context = canvas.getContext("2d")
     if (!context) return
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
-    const faceImage = canvas.toDataURL("image/jpeg", .88)
+    const faceImage = canvas.toDataURL("image/jpeg", .72)
     setPhase("processing"); setMessage("Comparing live face with registered profile…")
     stopCameras()
     try {

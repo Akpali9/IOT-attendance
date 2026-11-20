@@ -97,9 +97,10 @@ Set these server-only environment variables in local `.env.local` and the deploy
 
 - `FACEPP_API_KEY`
 - `FACEPP_API_SECRET`
+- `FACEPP_API_URL` (optional; defaults to the US Compare API endpoint; use the endpoint shown for your Face++ account region)
 - `FACE_MATCH_THRESHOLD` (0–100; default 80)
 
-Apply `supabase/migrations/202611200003_qr_face_verification_gate.sql` after the existing migrations. It removes direct browser execution of the QR attendance RPC; only the server service-role route may write QR attendance. Existing registered member photos in the private `attendance-member-photos` bucket are used as the reference profiles. Members without a registered photo must be enrolled before using QR + face attendance.
+Apply `supabase/migrations/202611200003_qr_face_verification_gate.sql` after the existing migrations. It removes direct browser execution of the QR attendance RPC; only the server service-role route may write QR attendance. Existing registered member photos in the private `attendance-member-photos` bucket are used as the reference profiles. New and updated member photos are normalized to JPEG (maximum 1024 px and 1.7 MB) before upload. Members with older oversized photos must edit their profile and re-upload the face photo.
 
 **Important security limitation:** Face++ Compare verifies similarity, but this integration does not implement active liveness detection. A printed photograph or replayed screen may still be presented to the camera. Do not represent this as spoof-resistant or deploy it for high-assurance attendance until an approved liveness/anti-spoof check is added and tested. Live face images are transmitted to Face++ for comparison; obtain appropriate consent, disclose this processing, and confirm the provider's data-retention and regional requirements before production use.
 
