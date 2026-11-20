@@ -1,5 +1,14 @@
 # LAM Attendance – QR card + Android fingerprint build
 
+# Update: fingerprint at registration, no email sign-in, voice announcements
+
+- **Fingerprint is taken when a member is registered.** After **Create member and add fingerprint**, the form moves to a fingerprint step; hand the phone to the member and they place their finger on the sensor. Members added earlier can still be enrolled from their profile (**Register fingerprint**). Re-enroll them once: older passkeys may not be discoverable.
+- **No email to sign in.** Fingerprint attendance no longer asks for an email. The phone offers the passkey saved at registration and the server identifies the member from it (discoverable passkeys). Apply `202611200002_passkey_usernameless.sql`.
+- **Voice announcements.** QR and fingerprint attendance both speak the result ("Accepted. <name>, checked in." / "Declined. <reason>") using the browser's built-in speech. Each dialog has a Voice on/off toggle.
+- Email stays on the member profile as a contact detail only.
+
+
+
 **Two attendance methods:** (1) a phone camera scans the QR on the member's ID card, or (2) the member signs with their Android phone fingerprint (WebAuthn passkey, built-in platform authenticator only). The IoT terminal webhook was removed; apply `202611200001_remove_iot_terminal.sql`. Older sections below that mention IoT terminals are historical.
 
 **Limit:** a web page can't force fingerprint specifically; if no fingerprint is enrolled, Android may offer its PIN/pattern.
@@ -59,7 +68,7 @@ This build now includes a real WebAuthn/passkey enrollment and authentication fl
    - `WEBAUTHN_RP_NAME=LAM Attendance`
 4. Deploy on HTTPS. Set `WEBAUTHN_ORIGIN` to the exact site origin (for example `https://your-project.vercel.app`, with no trailing slash) and `WEBAUTHN_RP_ID` to its hostname only. WebAuthn does not work on an ordinary insecure HTTP production origin. `localhost` is permitted for local development.
 5. Open a member's profile in the administrator workspace. On that member's Android phone, use Chrome and authenticate as an administrator, then choose **Enroll this phone** and complete the Android prompt. The passkey is bound to that member profile.
-6. Open **Phone fingerprint** from Overview or Attendance, enter the member email, and complete the Android biometric/passkey prompt. First successful authentication checks the member in; the next checks them out.
+6. Open **Phone fingerprint** from Overview or Attendance and complete the Android biometric/passkey prompt (no email needed). First successful authentication checks the member in; the next checks them out.
 
 **Operational note:** passkey enrollment currently requires the administrator session to be active on the phone being enrolled. Do not share an administrator password with members; have an authorized administrator supervise enrollment on the member's phone, or ask for a dedicated one-time enrollment invitation workflow before production rollout. A passkey may use the phone PIN/pattern as an OS fallback, so the app can require user verification but cannot force fingerprint-only authentication.
 

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react"
 import { BrowserQRCodeReader } from "@zxing/browser"
-import { Camera, Check, LoaderCircle, RefreshCw, ShieldCheck, X } from "lucide-react"
+import { Camera, Check, LoaderCircle, RefreshCw, ShieldCheck, Volume2, VolumeX, X } from "lucide-react"
 import { formatTime } from "./utils"
+import { announceDeclined, announceOutcome, isVoiceEnabled, setVoiceEnabled, speak, voiceSupported } from "./voice"
 import type { ScanResult } from "./types"
 
 type ScanPhase = "starting" | "scanning" | "processing" | "accepted" | "rejected"
@@ -38,6 +39,11 @@ export function ScannerDialog({ open, onClose, onScan }: ScannerDialogProps) {
   const [phase, setPhase] = useState<ScanPhase>("starting")
   const [message, setMessage] = useState("Starting camera…")
   const [scanSession, setScanSession] = useState(0)
+  const [voiceOn, setVoiceOn] = useState(true)
+
+  useEffect(() => {
+    if (open) setVoiceOn(isVoiceEnabled())
+  }, [open])
 
   useEffect(() => {
     onScanRef.current = onScan
@@ -66,26 +72,31 @@ export function ScannerDialog({ open, onClose, onScan }: ScannerDialogProps) {
               if (cancelled) return
               if (scanResult.status === "accepted") {
                 setPhase("accepted")
-                setMessage(`${scanResult.member?.name ?? "Member"} checked in at ${formatTime(scanResult.captured_at)}`)
+                setMessage(`Accepted · ${scanResult.member?.name ?? "Member"} checked in at ${formatTime(scanResult.captured_at)}`)
+                announceOutcome(scanResult)
                 playTone(true)
               } else if (scanResult.status === "checked_out") {
                 setPhase("accepted")
-                setMessage(`${scanResult.member?.name ?? "Member"} checked out at ${formatTime(scanResult.clocked_out_at)}`)
+                setMessage(`Accepted · ${scanResult.member?.name ?? "Member"} checked out at ${formatTime(scanResult.clocked_out_at)}`)
+                announceOutcome(scanResult)
                 playTone(true)
               } else if (scanResult.status === "already_completed") {
                 setPhase("rejected")
-                setMessage(`${scanResult.member?.name ?? "Member"} has completed attendance for today`)
+                setMessage(`Declined · ${scanResult.member?.name ?? "Member"} has completed attendance for today`)
+                announceOutcome(scanResult)
                 playTone(false)
               } else {
                 setPhase("rejected")
-                setMessage("Not registered · no attendance was recorded")
+                setMessage("Declined · not registered, no attendance was recorded")
+                announceOutcome(scanResult)
                 playTone(false)
               }
             })
             .catch(() => {
               if (cancelled) return
               setPhase("rejected")
-              setMessage("Attendance could not be recorded. Please try again.")
+              setMessage("Declined · attendance could not be recorded. Please try again.")
+              announceDeclined("Attendance could not be recorded. Please try again.")
               playTone(false)
             })
         })
@@ -102,6 +113,7 @@ export function ScannerDialog({ open, onClose, onScan }: ScannerDialogProps) {
         if (!cancelled) {
           setPhase("rejected")
           setMessage("Camera unavailable · allow camera access and try again")
+          announceDeclined("Camera unavailable.")
           playTone(false)
         }
       }
@@ -163,7 +175,12 @@ export function ScannerDialog({ open, onClose, onScan }: ScannerDialogProps) {
           )}
         </div>
         <footer className="flex items-center gap-2 border-t border-[#edf0ec] px-5 py-3 text-[10px] text-[#829087]">
-          <ShieldCheck size={13} aria-hidden="true" /> ID cards are read locally by the camera. Only the opaque credential is sent for verification; card images are not uploaded.
+          <ShieldCheck size={13} aria-hidden="true" /> <span className="flex-1">ID cards are read locally by the camera. Only the opaque credential is sent for verification; card images are not uploaded.</span>
+          {voiceSupported() && (
+            <button type="button" aria-pressed={voiceOn} aria-label={voiceOn ? "Turn voice announcements off" : "Turn voice announcements on"} onClick={() => { const next = !voiceOn; setVoiceEnabled(next); setVoiceOn(next); if (next) speak("Voice on.") }} className="flex shrink-0 items-center gap-1.5 rounded-md border border-[#dfe6df] px-2.5 py-2 font-medium text-[#53655a] hover:bg-[#f7faf6]">
+              {voiceOn ? <Volume2 size={12} aria-hidden="true" /> : <VolumeX size={12} aria-hidden="true" />} Voice {voiceOn ? "on" : "off"}
+            </button>
+          )}
         </footer>
       </section>
     </div>

@@ -6,7 +6,7 @@ import QRCode from "qrcode"
 import { ORGANIZATION_NAME, ORGANIZATION_SHORT_NAME } from "./constants"
 import { formatTime, initials } from "./utils"
 import type { AttendanceMember, AttendanceRecord } from "./types"
-import { EnrollPhonePasskey } from "./phone-biometric"
+import { EnrollPhonePasskey, RegistrationFingerprintStep } from "./phone-biometric"
 
 export type MemberFormValues = {
   full_name: string
@@ -22,7 +22,8 @@ type MemberFormDialogProps = {
   saving: boolean
   error?: string | null
   onClose: () => void
-  onSubmit: (values: MemberFormValues, photo: File | null) => Promise<void>
+  /** Resolves with the new member's id when a member was created (so fingerprint registration can follow), otherwise null. */
+  onSubmit: (values: MemberFormValues, photo: File | null) => Promise<string | null>
 }
 
 const emptyValues: MemberFormValues = {
@@ -47,11 +48,13 @@ export function MemberFormDialog({
   const [fileError, setFileError] = useState<string | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [newMember, setNewMember] = useState<{ id: string; name: string } | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const cameraStreamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     if (!open) return
+    setNewMember(null)
     setValues({
       full_name: member?.full_name ?? "",
       department: member?.department ?? "",
@@ -126,7 +129,9 @@ export function MemberFormDialog({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    await onSubmit(values, photoFile)
+    const createdId = await onSubmit(values, photoFile)
+    // New members go straight to fingerprint registration before the form closes.
+    if (!member && createdId) setNewMember({ id: createdId, name: values.full_name.trim() })
   }
 
   return (
@@ -135,14 +140,17 @@ export function MemberFormDialog({
         <header className="mb-5 flex items-start justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#7d8c81]">{member ? "Member profile" : "Directory"}</p>
-            <h2 id="member-form-title" className="mt-1 text-lg font-semibold">{member ? "Edit member details" : "Add a member"}</h2>
-            <p className="mt-1 text-xs text-[#87928b]">{member ? "Update contact details and photo." : "Create a member profile and private QR credential."}</p>
+            <h2 id="member-form-title" className="mt-1 text-lg font-semibold">{member ? "Edit member details" : newMember ? "Register fingerprint" : "Add a member"}</h2>
+            <p className="mt-1 text-xs text-[#87928b]">{member ? "Update contact details and photo." : newMember ? "Last step: take the member's fingerprint." : "Create a member profile, private QR credential and fingerprint."}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-2 text-[#748078] hover:bg-[#f4f6f3]" aria-label="Close member form">
             <X size={18} aria-hidden="true" />
           </button>
         </header>
 
+        {newMember ? (
+          <RegistrationFingerprintStep memberId={newMember.id} memberName={newMember.name} onDone={onClose} />
+        ) : (
         <form onSubmit={submit} className="space-y-4">
           <div className="flex items-center gap-4">
             <label className="grid size-[68px] shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border border-dashed border-[#cfd8ce] bg-[#f6f8f5] text-[#77867b]">
@@ -196,10 +204,11 @@ export function MemberFormDialog({
             <button type="button" onClick={onClose} className="rounded-lg border border-[#e3e8e2] px-4 py-2.5 text-xs font-medium text-[#627168] hover:bg-[#f8faf7]">Cancel</button>
             <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-lg bg-[#193e30] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#24533f] disabled:cursor-not-allowed disabled:opacity-60">
               {saving && <LoaderCircle className="animate-spin" size={14} aria-hidden="true" />}
-              {saving ? "Saving…" : member ? "Save changes" : "Create member"}
+              {saving ? "Saving…" : member ? "Save changes" : "Create member and add fingerprint"}
             </button>
           </div>
         </form>
+        )}
       </section>
       {cameraOpen && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-[#10241c]/80 p-4">

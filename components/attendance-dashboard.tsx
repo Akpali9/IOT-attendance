@@ -440,11 +440,12 @@ export default function AttendanceDashboard() {
     return result
   }, [mutateDashboard, supabase])
 
-  const saveMember = useCallback(async (values: MemberFormValues, photo: File | null) => {
-    if (!authUser) return
+  const saveMember = useCallback(async (values: MemberFormValues, photo: File | null): Promise<string | null> => {
+    if (!authUser) return null
     setMemberSaving(true)
     setMemberError(null)
     let uploadedPath: string | null = null
+    let createdMemberId: string | null = null
 
     try {
       if (photo) {
@@ -479,22 +480,28 @@ export default function AttendanceDashboard() {
           await supabase.storage.from(MEMBER_PHOTO_BUCKET).remove([editingMember.face_photo_path])
         }
       } else {
-        const { error } = await supabase.from("attendance_members").insert({
+        const { data, error } = await supabase.from("attendance_members").insert({
           ...valuesForDatabase,
           face_photo_path: uploadedPath,
-        })
+        }).select("id").single()
         if (error) throw error
+        createdMemberId = data.id as string
       }
 
       await mutateDashboard()
-      setMemberFormOpen(false)
-      setEditingMember(null)
-      setSelectedMember(null)
+      // A new member's dialog stays open for fingerprint registration; it closes itself when that step finishes.
+      if (!createdMemberId) {
+        setMemberFormOpen(false)
+        setEditingMember(null)
+        setSelectedMember(null)
+      }
+      return createdMemberId
     } catch {
       if (uploadedPath) {
         await supabase.storage.from(MEMBER_PHOTO_BUCKET).remove([uploadedPath])
       }
       setMemberError("Could not save this member. Check the details and try again.")
+      return null
     } finally {
       setMemberSaving(false)
     }

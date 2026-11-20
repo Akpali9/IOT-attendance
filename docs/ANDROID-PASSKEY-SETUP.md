@@ -38,7 +38,7 @@ For each member, enroll their own phone. Avoid enrolling a shared phone to multi
 
 1. Open Overview or Attendance.
 2. Tap **Phone fingerprint**.
-3. Enter the member email address registered in LAM.
+3. No email is needed: tap Scan fingerprint and the phone offers the passkey saved at registration.
 4. Complete the Android prompt.
 5. The first successful scan of the UTC attendance day checks in; the next checks out. A third scan reports that the day is complete.
 
