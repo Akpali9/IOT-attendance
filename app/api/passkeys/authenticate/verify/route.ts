@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     const userHandle = response.response.userHandle
     if (userHandle && fromBase64Url(userHandle).toString('utf8') !== credential.member_id) return declined('Fingerprint does not match this member.')
 
-    const { origin, rpID } = webAuthnConfig()
+    const { origin, rpID } = await webAuthnConfig()
     const verification = await verifyAuthenticationResponse({
       response, expectedChallenge: stored.challenge, expectedOrigin: origin, expectedRPID: rpID,
       credential: { id: credential.credential_id, publicKey: new Uint8Array(Buffer.from(credential.public_key, 'base64')), counter: Number(credential.counter), transports: credential.transports ?? [] },

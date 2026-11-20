@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
 export function serviceClient() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -27,9 +27,20 @@ export async function requireAttendanceAdmin() {
   return data ? { id: user.id, role: data.role as string } : null
 }
 
-export function webAuthnConfig() {
-  const origin = process.env.WEBAUTHN_ORIGIN
-  const rpID = process.env.WEBAUTHN_RP_ID
-  if (!origin || !rpID) throw new Error('Set WEBAUTHN_ORIGIN and WEBAUTHN_RP_ID.')
-  return { origin, rpID, rpName: process.env.WEBAUTHN_RP_NAME ?? 'LAM Attendance' }
+// Uses WEBAUTHN_ORIGIN / WEBAUTHN_RP_ID when set (recommended for production).
+// Otherwise falls back to the address the request came in on, so the app still works
+// on Vercel previews and localhost without extra setup.
+export async function webAuthnConfig() {
+  const rpName = process.env.WEBAUTHN_RP_NAME ?? 'LAM Attendance'
+  const envOrigin = process.env.WEBAUTHN_ORIGIN?.trim().replace(/\/+$/, '')
+  const envRpID = process.env.WEBAUTHN_RP_ID?.trim()
+  if (envOrigin && envRpID) return { origin: envOrigin, rpID: envRpID, rpName }
+
+  const h = await headers()
+  const host = (h.get('x-forwarded-host') ?? h.get('host') ?? '').split(',')[0].trim()
+  if (!host) throw new Error('Could not work out the site address. Set WEBAUTHN_ORIGIN and WEBAUTHN_RP_ID.')
+  const hostname = host.replace(/:\d+$/, '')
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1'
+  const proto = isLocal ? 'http' : (h.get('x-forwarded-proto') ?? 'https').split(',')[0].trim()
+  return { origin: envOrigin ?? `${proto}://${host}`, rpID: envRpID ?? hostname, rpName }
 }

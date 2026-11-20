@@ -10,7 +10,7 @@ export const runtime = 'nodejs'
 export async function POST() {
   try {
     const db = serviceClient()
-    const { rpID } = webAuthnConfig()
+    const { rpID } = await webAuthnConfig()
     const options = await generateAuthenticationOptions({ rpID, userVerification: 'required' })
 
     // Keep the table small: drop challenges that were never used.

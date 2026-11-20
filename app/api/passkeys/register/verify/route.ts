@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const db = serviceClient()
     const { data: challenge } = await db.from('attendance_passkey_challenges').delete().eq('member_id', memberId).eq('purpose', 'register').eq('admin_user_id', adminUser.id).select('challenge,admin_user_id').maybeSingle()
     if (!challenge || challenge.admin_user_id !== adminUser.id) return NextResponse.json({ error: 'Enrollment expired. Start again.' }, { status: 400 })
-    const { origin, rpID } = webAuthnConfig()
+    const { origin, rpID } = await webAuthnConfig()
     const verification = await verifyRegistrationResponse({ response, expectedChallenge: challenge.challenge, expectedOrigin: origin, expectedRPID: rpID, requireUserVerification: true })
     if (!verification.verified || !verification.registrationInfo) return NextResponse.json({ error: 'Phone biometric verification failed.' }, { status: 400 })
     const info = verification.registrationInfo
