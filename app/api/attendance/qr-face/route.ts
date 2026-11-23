@@ -72,7 +72,13 @@ export async function POST(request: Request) {
     const threshold = Number(process.env.FACE_MATCH_THRESHOLD ?? "80")
     if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) return json({ error: "FACE_MATCH_THRESHOLD must be a number from 0 to 100. Attendance was not recorded." }, 500)
     if (result.confidence < threshold) return json({ status: "face_mismatch", message: "Face does not match the registered member. No attendance was recorded." })
-    const { data, error } = await db.rpc("record_qr_attendance", { p_qr_token: body.qrToken.trim() })
+    const { data, error } = await db.rpc(
+  "record_qr_attendance",
+  {
+    p_qr_token: body.qrToken.trim(),
+    p_admin_user_id: user.id
+  }
+);
     if (error) {
       // Keep the raw database details in server logs, but return actionable,
       // non-secret diagnostics to the authenticated admin in the scanner.
