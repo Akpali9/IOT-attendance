@@ -1,4 +1,4 @@
-# LAM Attendance – QR card + Android fingerprint build
+ # LAM Attendance – QR card + Android fingerprint build
 
 # Update: fingerprint at registration, no email sign-in, voice announcements
 
